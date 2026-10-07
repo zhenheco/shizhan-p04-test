@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- 想改瀏覽器分頁上的標題，改下面這一行 -->
+<title>我的點子清單</title>
+<style>
+  /* 想換配色，只要改這一排顏色就好 */
+  :root { --ink:#1d2147; --muted:#5b6086; --line:#e3e6f5; --paper:#fff; --wash:#e8ecff;
+          --mark:#ffd44d; --ok:#12805c; --ok-bg:#eaf7f1; --bad:#b3261e; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:20px 14px 32px; background:var(--wash); color:var(--ink);
+         font:17px/1.6 "PingFang TC","Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif; }
+  main { max-width:520px; margin:0 auto; background:var(--paper); border-radius:22px; overflow:hidden;
+         box-shadow:0 18px 40px -18px rgba(29,33,71,.45); }
+
+  /* 上方深色標題區：標題 + 進度 */
+  .head { position:relative; padding:24px 22px 22px; background:var(--ink); color:#fff; overflow:hidden; }
+  h1 { margin:0; font-size:1.7rem; font-weight:800; letter-spacing:.02em; line-height:1.25; }
+  .tagline { margin:2px 0 18px; color:#c9cdf0; font-size:.95rem; }
+  .progress-text { margin:0 0 8px; font-size:1.3rem; font-weight:700; }
+  .bar { height:14px; border-radius:7px; background:rgba(255,255,255,.18); overflow:hidden; }
+  .bar-fill { height:100%; width:0; border-radius:7px; background:var(--mark); transition:width .5s ease, background-color .3s; }
+  .all-done .bar-fill { background:#5fe0a8; }
+  .celebrate { margin:10px 0 0; font-weight:700; color:#5fe0a8; }
+  .celebrate:empty { margin:0; }
+
+  /* 全部完成時的小慶祝：純 CSS 的彩紙，只播放一次 */
+  .confetti { display:none; position:absolute; inset:0; pointer-events:none; }
+  .all-done .confetti { display:block; }
+  .confetti i { position:absolute; top:-14px; left:var(--x); width:9px; height:14px; border-radius:2px;
+                background:var(--c); opacity:0; animation:fall 1.8s ease-in var(--d) 1 both; }
+  .confetti i:nth-child(1) { --x:8%;  --c:#ffd44d; --d:0s; }
+  .confetti i:nth-child(2) { --x:22%; --c:#5fe0a8; --d:.2s; }
+  .confetti i:nth-child(3) { --x:38%; --c:#ff8fa3; --d:.1s; }
+  .confetti i:nth-child(4) { --x:55%; --c:#8fb4ff; --d:.35s; }
+  .confetti i:nth-child(5) { --x:70%; --c:#ffd44d; --d:.15s; }
+  .confetti i:nth-child(6) { --x:84%; --c:#5fe0a8; --d:.3s; }
+  .confetti i:nth-child(7) { --x:93%; --c:#ff8fa3; --d:.05s; }
+  @keyframes fall { 0% { opacity:1; transform:translateY(0) rotate(0); }
+                    100% { opacity:0; transform:translateY(150px) rotate(300deg); } }
+
+  /* 輸入區 */
+  .body { padding:20px 22px 22px; }
+  .field { display:block; margin-bottom:6px; font-weight:700; }
+  .row { display:flex; gap:8px; }
+  input[type="text"] { flex:1; min-width:0; font:inherit; padding:10px 12px; border:2px solid var(--ink); border-radius:12px; background:#fff; color:var(--ink); }
+  button { font:inherit; cursor:pointer; }
+  .add { padding:10px 18px; border:2px solid var(--ink); border-radius:12px; background:var(--mark); color:var(--ink);
+         font-weight:800; box-shadow:0 3px 0 var(--ink); }
+  .add:active { transform:translateY(2px); box-shadow:0 1px 0 var(--ink); }
+  .message { min-height:1.6em; margin:6px 0 10px; color:var(--bad); font-size:.95rem; }
+
+  /* 清單：一個點子一列 */
+  ul { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+  li { display:flex; align-items:flex-start; gap:12px; padding:12px 8px 12px 14px; border:1px solid var(--line); border-radius:14px; background:var(--paper); }
+  li.done { background:var(--ok-bg); border-color:#bfe5d4; }
+  .idea-text { flex:1; min-width:0; padding-top:2px; overflow-wrap:anywhere; word-break:break-word; cursor:pointer; }
+  li.done .idea-text { text-decoration:line-through; color:var(--muted); }
+  .del { flex:none; padding:4px 10px; min-height:36px; border:0; border-radius:10px; background:transparent; color:var(--muted); font-size:.9rem; }
+  .del:hover { background:#fdecea; color:var(--bad); }
+  input[type="checkbox"] { appearance:none; -webkit-appearance:none; flex:none; width:28px; height:28px; margin:0; display:grid; place-items:center;
+                           border:2px solid var(--ink); border-radius:9px; background:#fff; cursor:pointer; }
+  input[type="checkbox"]::after { content:""; width:7px; height:13px; margin-top:-2px; border:solid #fff; border-width:0 3px 3px 0;
+                                  transform:rotate(45deg) scale(0); transition:transform .15s; }
+  input[type="checkbox"]:checked { background:var(--ok); border-color:var(--ok); }
+  input[type="checkbox"]:checked::after { transform:rotate(45deg) scale(1); }
+
+  /* 「只看未完成」篩選列（P01 新增） */
+  .toolbar { display:flex; justify-content:space-between; align-items:center; gap:8px; margin:0 0 10px; color:var(--muted); font-size:.95rem; }
+  .filter { display:flex; align-items:center; gap:8px; }
+  .filter label { cursor:pointer; }
+  li.empty { display:block; }
+
+  /* 沒有任何點子時的引導 */
+  .empty { margin:0; padding:22px 12px; text-align:center; color:var(--muted); border:2px dashed #c9cdf0; border-radius:14px; }
+
+  .notice { margin:18px 0 0; color:var(--muted); font-size:.85rem; }
+  :focus-visible { outline:3px solid var(--ink); outline-offset:2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .confetti i { animation:none; }
+    .bar-fill, input[type="checkbox"]::after { transition:none; }
+  }
+</style>
+</head>
+<body>
+<main id="app">
+  <header class="head">
+    <!-- 想改標題，改下面兩行文字 -->
+    <h1>我的點子清單</h1>
+    <p class="tagline">寫下來，做完就打勾。</p>
+    <p id="progress-text" class="progress-text"></p>
+    <div id="progress-bar" class="bar" role="progressbar" aria-label="完成進度" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0">
+      <div id="progress-fill" class="bar-fill"></div>
+    </div>
+    <p id="celebrate" class="celebrate" role="status"></p>
+    <span class="confetti" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+  </header>
+
+  <div class="body">
+    <form id="idea-form" autocomplete="off">
+      <label class="field" for="idea-input">新增一個點子（最多 200 字）</label>
+      <div class="row">
+        <input type="text" id="idea-input" name="idea" maxlength="200">
+        <button type="submit" class="add">加入</button>
+      </div>
+    </form>
+    <p id="message" class="message" role="alert"></p>
+    <p id="storage-warning" class="message" role="status" hidden>這個瀏覽器目前無法儲存資料（可能是瀏覽器的設定擋住了）。工具還是能用，但這次寫的內容在關掉或重新整理後不會留下。</p>
+
+    <div class="toolbar">
+      <span class="filter"><input type="checkbox" id="only-unfinished"> <label for="only-unfinished">只看未完成</label></span>
+      <span id="shown"></span>
+    </div>
+    <ul id="idea-list"></ul>
+    <p id="empty-state" class="empty" hidden>還沒有點子。在上面的空格寫下第一個，按「加入」就會出現在這裡。</p>
+
+    <p class="notice">你的點子會自動存在這個瀏覽器裡，重新整理後還在。資料只存在這台電腦的這個瀏覽器；換電腦、換瀏覽器、清除瀏覽資料就看不到。</p>
+  </div>
+</main>
+
+<script>
+/* ===== 一、純邏輯：只處理資料（陣列），完全不碰畫面 =====
+   每個點子長這樣：{ id: 數字, text: 文字, done: true 或 false }
+   下面的函式都不會改動傳進來的陣列，而是回傳一份新的。 */
+const IdeaLogic = {
+  // 每筆點子最多幾個字（和上方輸入框的 maxlength="200" 要一致）
+  maxLength: 200,
+
+  // 示範資料：想換成自己的點子，改這裡的 text 即可（共三筆）
+  createDemoIdeas() {
+    return [
+      { id: 1, text: '整理下次旅行要帶的東西', done: false },
+      { id: 2, text: '週末試做一道新食譜', done: true },
+      { id: 3, text: '把書櫃上的書分類', done: false }
+    ];
+  },
+
+  // 檢查輸入：去掉頭尾空白後不能是空的、不能超過 maxLength 字
+  validate(text) {
+    if (typeof text !== 'string') return { ok: false, error: '請輸入文字。' };
+    const clean = text.trim();
+    if (clean === '') return { ok: false, error: '請先輸入點子內容，不能只有空白。' };
+    if (clean.length > this.maxLength) {
+      return { ok: false, error: '點子最多 ' + this.maxLength + ' 字，請縮短後再加入。' };
+    }
+    return { ok: true, text: clean };
+  },
+
+  // 加入一筆；成功回傳 { ok: true, list }，失敗回傳 { ok: false, error }
+  add(list, text) {
+    const result = this.validate(text);
+    if (!result.ok) return result;
+    const nextId = list.reduce((max, item) => Math.max(max, item.id), 0) + 1;
+    return { ok: true, list: list.concat([{ id: nextId, text: result.text, done: false }]) };
+  },
+
+  // 切換完成／取消完成（只改指定 id 那一筆）
+  toggle(list, id) {
+    return list.map((item) => (item.id === id ? { id: item.id, text: item.text, done: !item.done } : item));
+  },
+
+  // 刪除指定 id 那一筆
+  remove(list, id) {
+    return list.filter((item) => item.id !== id);
+  },
+
+  // 只看未完成：onlyUnfinished 為 true 時，回傳「還沒完成」的那些；否則回傳全部。
+  // 只是挑出要顯示哪些，原本的陣列不會被改動，被隱藏的點子也沒有被刪除。
+  visible(list, onlyUnfinished) {
+    return onlyUnfinished ? list.filter((item) => !item.done) : list.slice();
+  },
+
+  // 統計：總數與完成數（永遠算全部，不受篩選影響）
+  stats(list) {
+    return { total: list.length, done: list.filter((item) => item.done).length };
+  },
+
+  // 存在瀏覽器裡的名稱。想讓不同工具各存各的，就把名稱改成不一樣的
+  storageKey: 'shizhan-idea-list-v1',
+
+  // 存檔用：把清單變成一段文字（只留 id、text、done 三樣）
+  serialize(list) {
+    return JSON.stringify(list.map((item) => ({ id: item.id, text: item.text, done: item.done })));
+  },
+
+  // 讀檔用：把存起來的文字變回清單。
+  // 從沒存過、文字壞掉、格式不對，都回傳 fallback() 的結果（示範資料），不會當掉；
+  // 存了一個空清單（你把點子全刪了）就維持空的，不會又變回示範資料。
+  // 清單裡格式不對的項目會被丟掉，其餘照常使用。
+  restore(raw, fallback) {
+    const demo = typeof fallback === 'function' ? fallback : () => this.createDemoIdeas();
+    if (typeof raw !== 'string') return demo();
+    let data;
+    try { data = JSON.parse(raw); } catch (e) { return demo(); }
+    if (!Array.isArray(data)) return demo();
+    const seen = new Set();
+    const good = [];
+    data.forEach((item) => {
+      if (item === null || typeof item !== 'object' || Array.isArray(item)) return;
+      const text = typeof item.text === 'string' ? item.text.trim() : '';
+      if (!Number.isSafeInteger(item.id) || item.id < 1 || seen.has(item.id)) return;
+      if (text === '' || text.length > this.maxLength || typeof item.done !== 'boolean') return;
+      seen.add(item.id);
+      good.push({ id: item.id, text: text, done: item.done });
+    });
+    return data.length > 0 && good.length === 0 ? demo() : good;
+  }
+};
+window.IdeaLogic = IdeaLogic; // 只為了讓自動測試能取用，網頁本身不需要
+
+/* ===== 二、畫面：把資料畫出來，並接上按鈕 =====
+   文字一律用 textContent 放進去，所以即使有人輸入 <script> 也只會顯示成普通文字。 */
+(function setupPage() {
+  const app = document.getElementById('app');
+  const form = document.getElementById('idea-form');
+  const input = document.getElementById('idea-input');
+  const message = document.getElementById('message');
+  const progressText = document.getElementById('progress-text');
+  const progressBar = document.getElementById('progress-bar');
+  const progressFill = document.getElementById('progress-fill');
+  const celebrate = document.getElementById('celebrate');
+  const emptyState = document.getElementById('empty-state');
+  const warning = document.getElementById('storage-warning');
+  const shown = document.getElementById('shown');
+  const filterBox = document.getElementById('only-unfinished');
+  const listEl = document.getElementById('idea-list');
+  if (!app || !form || !input || !message || !progressText || !progressBar || !progressFill
+      || !celebrate || !emptyState || !warning || !shown || !filterBox || !listEl) return; // 沒有畫面（例如測試環境）就不啟動
+
+  // 存檔、讀檔：存在這個瀏覽器的 localStorage。失敗（瀏覽器擋住、空間滿）時只顯示提醒，工具照常能用
+  function readSaved() {
+    try { return window.localStorage.getItem(IdeaLogic.storageKey); }
+    catch (e) { warning.hidden = false; return null; }
+  }
+  function save() {
+    try { window.localStorage.setItem(IdeaLogic.storageKey, IdeaLogic.serialize(ideas)); warning.hidden = true; }
+    catch (e) { warning.hidden = false; }
+  }
+
+  let ideas = IdeaLogic.restore(readSaved(), () => IdeaLogic.createDemoIdeas()); // 一打開就讀回上次存的
+
+  function render() {
+    const s = IdeaLogic.stats(ideas);
+    const allDone = s.total > 0 && s.done === s.total;
+    progressText.textContent = '已完成 ' + s.done + ' / ' + s.total;
+    progressBar.setAttribute('aria-valuemax', String(s.total));
+    progressBar.setAttribute('aria-valuenow', String(s.done));
+    progressFill.style.width = (s.total ? Math.round((s.done / s.total) * 100) : 0) + '%';
+    app.classList.toggle('all-done', allDone);
+    celebrate.textContent = allDone ? '全部完成，太棒了！' : '';
+    emptyState.hidden = s.total > 0;
+    const shownIdeas = IdeaLogic.visible(ideas, filterBox.checked);
+    shown.textContent = '目前顯示 ' + shownIdeas.length + ' 筆';
+    listEl.replaceChildren();
+    if (filterBox.checked && s.total > 0 && shownIdeas.length === 0) {
+      const empty = document.createElement('li');
+      empty.className = 'empty';
+      empty.textContent = '目前沒有未完成的點子（已完成的還在，關掉篩選就看得到）';
+      listEl.appendChild(empty);
+    }
+    shownIdeas.forEach((item) => {
+      const li = document.createElement('li');
+      if (item.done) li.className = 'done';
+
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.id = 'idea-' + item.id;
+      box.checked = item.done;
+      box.setAttribute('aria-label', '完成：' + item.text);
+      box.setAttribute('data-id', String(item.id));
+      box.addEventListener('change', () => {
+        ideas = IdeaLogic.toggle(ideas, item.id);
+        save();
+        render();
+        const again = listEl.querySelector('[data-id="' + item.id + '"]');
+        (again || filterBox).focus(); // 讓鍵盤使用者不會失去位置（該筆被篩選隱藏時，改回到篩選開關）
+      });
+
+      const text = document.createElement('label');
+      text.className = 'idea-text';
+      text.setAttribute('for', 'idea-' + item.id);
+      text.appendChild(document.createTextNode(item.text));
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'del';
+      del.textContent = '刪除';
+      del.setAttribute('aria-label', '刪除：' + item.text);
+      del.addEventListener('click', () => {
+        ideas = IdeaLogic.remove(ideas, item.id);
+        save();
+        render();
+        input.focus();
+      });
+
+      li.appendChild(box);
+      li.appendChild(text);
+      li.appendChild(del);
+      listEl.appendChild(li);
+    });
+  }
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault(); // 不讓表單重新載入頁面
+    const result = IdeaLogic.add(ideas, input.value);
+    if (!result.ok) {
+      message.textContent = result.error;
+      input.focus();
+      return;
+    }
+    ideas = result.list;
+    save();
+    message.textContent = '';
+    input.value = '';
+    render();
+    input.focus();
+  });
+
+  filterBox.addEventListener('change', render); // 開關一切換就重畫
+
+  render();
+})();
+</script>
+</body>
+</html>
